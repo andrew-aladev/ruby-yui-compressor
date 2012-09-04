@@ -21,10 +21,12 @@ module YUI #:nodoc:
     end
 
     def initialize(options = {}) #:nodoc:
-      @options = self.class.default_options.merge(options)
-      @command = [path_to_java]
-      @command << java_opts unless java_opts.empty?
-      @command += ["-jar", path_to_jar_file, *(command_option_for_type + command_options)]
+      @options  = self.class.default_options.merge(options)
+      java_opts = @options.delete(:java_opts)
+      @verbose  = @options.delete(:verbose)
+      @command  = [path_to_java]
+      @command  << java_opts if java_opts
+      @command  += ["-jar", path_to_jar_file, *(command_option_for_type + command_options)]
     end
 
     def command #:nodoc:
@@ -40,7 +42,7 @@ module YUI #:nodoc:
     #   compressor = YUI::CssCompressor.new
     #   compressor.compress(<<-END_CSS)
     #     div.error {
-    #       color: red;
+    #       color: red;      puts
     #     }
     #     div.warning {
     #       display: none;
@@ -67,6 +69,7 @@ module YUI #:nodoc:
     def compress(stream_or_string)
       streamify(stream_or_string) do |stream|
         output = true
+        puts command if @verbose
         status = POpen4.popen4(command, "b") do |stdout, stderr, stdin, pid|
           begin
             stdin.binmode
@@ -76,6 +79,12 @@ module YUI #:nodoc:
               yield stdout
             else
               output = stdout.read
+            end
+            
+            if @verbose
+              stderr.each do |line|
+                puts line
+              end
             end
 
           rescue Exception => e
@@ -108,10 +117,6 @@ module YUI #:nodoc:
         options.delete(:java) || "java"
       end
 
-      def java_opts
-        options.delete(:java_opts) || ""
-      end
-
       def path_to_jar_file
         options.delete(:jar_file) || File.join(File.dirname(__FILE__), *%w".. yuicompressor-2.4.7.jar")
       end
@@ -131,7 +136,7 @@ module YUI #:nodoc:
         from_stream.close
         to_stream.close
       end
-
+      
       def command_option_for_type
         ["--type", self.class.compressor_type.to_s]
       end
@@ -161,6 +166,8 @@ module YUI #:nodoc:
     #                        number of characters in each line before a newline
     #                        is added. If <tt>:line_break</tt> is 0, a newline
     #                        is added after each CSS rule.
+    # <tt>:java_opts</tt>::  Java options, that will be appended to command, that invokes compressor.jar
+    # <tt>:verbose</tt>::    Defaults to +false+. If +true+, make output verbose
     #
     def initialize(options = {})
       super
@@ -201,6 +208,8 @@ module YUI #:nodoc:
     #                                 Compressor will ensure semicolons exist
     #                                 after each statement to appease tools like
     #                                 JSLint.
+    # <tt>:java_opts</tt>::  Java options, that will be appended to command, that invokes compressor.jar
+    # <tt>:verbose</tt>::    Defaults to +false+. If +true+, make output verbose
     #
     def initialize(options = {})
       super
